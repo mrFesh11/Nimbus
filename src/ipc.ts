@@ -11,6 +11,8 @@ export const ipc = {
   saveConfig: (cfg: AppConfig) => invoke<void>("save_config", { cfg }),
   exec: (cfg: ServerCfg, cmd: string) => invoke<ExecOut>("ssh_exec", { cfg, cmd }),
   execPty: (cfg: ServerCfg, cmd: string) => invoke<ExecOut>("ssh_exec_pty", { cfg, cmd }),
+  dockerAction: (cfg: ServerCfg, action: string, name: string) =>
+    invoke<ExecOut>("docker_action", { cfg, action, name }),
   provideSecret: (key: string, value: string) => invoke<void>("provide_secret", { key, value }),
   trustHostKey: (label: string, fingerprint: string) =>
     invoke<void>("trust_host_key", { label, fingerprint }),

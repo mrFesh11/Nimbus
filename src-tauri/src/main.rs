@@ -101,6 +101,27 @@ fn provide_secret(key: String, value: String) {
 }
 
 #[tauri::command]
+async fn docker_action(
+    state: State<'_, AppState>,
+    cfg: ServerCfg,
+    action: String,
+    name: String,
+) -> Result<ExecOut, String> {
+    let allowed = ["start", "stop", "restart", "pause", "unpause", "kill", "rm"];
+    if !allowed.contains(&action.as_str()) {
+        return Err(format!("недопустимое действие: {action}"));
+    }
+    let quoted = format!("'{}'", name.replace('\'', r"'\''"));
+    let cmd = if action == "rm" {
+        format!("docker rm -f {quoted} 2>&1")
+    } else {
+        format!("docker {action} {quoted} 2>&1")
+    };
+    let controls = state.controls.clone();
+    blocking(move || ssh::with_session(&controls, &cfg, |s| ssh::exec(s, &cmd))).await
+}
+
+#[tauri::command]
 fn trust_host_key(label: String, fingerprint: String) -> Result<(), String> {
     ssh::trust_host(&label, &fingerprint)
 }
@@ -511,6 +532,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             setup_tray(app)?;
             if let Ok(dir) = app.path().app_config_dir() {
@@ -533,6 +555,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             ssh_exec,
             ssh_exec_pty,
+            docker_action,
             provide_secret,
             trust_host_key,
             import_ssh_config,

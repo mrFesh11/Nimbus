@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ipc } from "./ipc";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { LangContext, loadLang, storeLang, useT, type Lang } from "./i18n";
 import { metricsCmd, parseMetrics } from "./metrics";
 import type { Runtime, ServerCfg, Snippet, Status, Tab, TabMode } from "./types";
@@ -93,6 +94,14 @@ function AppInner() {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
+  const notify = useCallback(async (title: string, body: string) => {
+    try {
+      let granted = await isPermissionGranted();
+      if (!granted) granted = (await requestPermission()) === "granted";
+      if (granted) sendNotification({ title, body });
+    } catch {}
+  }, []);
+
   useEffect(() => {
     ipc.loadConfig().then((cfg) => {
       const srv = cfg?.servers ?? [];
@@ -150,12 +159,14 @@ function AppInner() {
 
   const pollServer = useCallback(async (s: ServerCfg, withDocker?: boolean) => {
     const rt = runtimesRef.current[s.id] ?? emptyRuntime();
+    const prevStatus = rt.status;
     const docker =
       withDocker ?? tabsRef.current.some((t) => t.serverId === s.id && t.mode === "overview");
     try {
       if (rt.status !== "online") setStatus(s.id, "connecting");
       const res = await ipc.exec(s, metricsCmd(!rt.metrics?.cpuSample, docker));
       const m = parseMetrics(res.out, rt.metrics);
+      if (prevStatus === "offline") void notify(`🟢 ${s.name}`, "Сервер снова онлайн");
       setRuntimes((r) => {
         const cur = r[s.id] ?? emptyRuntime();
         const push = (arr: number[], v: number) => [...arr.slice(-59), v];
@@ -180,9 +191,10 @@ function AppInner() {
       });
     } catch (e) {
       const friendly = handleAuthError(s, e);
+      if (prevStatus === "online") void notify(`🔴 ${s.name}`, friendly ?? "Сервер недоступен");
       setStatus(s.id, "offline", friendly ?? String(e));
     }
-  }, [setStatus, handleAuthError]);
+  }, [setStatus, handleAuthError, notify]);
 
   useEffect(() => {
     if (!loaded) return;
