@@ -198,7 +198,7 @@ export function FilesView({ server, toast }: Props) {
                 onClick={() => setLocalSel(f.name === ".." ? null : f.name)}
                 onDoubleClick={() => openLocal(f)}
               >
-                <span className="fname" style={{ color: f.ftype === "dir" ? "#a9c2dc" : "var(--body)" }}>
+                <span className="fname" style={{ color: f.ftype === "dir" ? "#a3cdb4" : "var(--body)" }}>
                   <span style={f.ftype === "dir" ? { width: 11, height: 9, borderRadius: 2, background: "var(--accent)", opacity: 0.85, flex: "none" } : { width: 10, height: 12, borderRadius: 2, border: "1px solid #4a4f58", flex: "none" }} />
                   <span>{f.ftype === "dir" && f.name !== ".." ? f.name + "/" : f.name}</span>
                 </span>
@@ -237,7 +237,7 @@ export function FilesView({ server, toast }: Props) {
                 onClick={() => setRemoteSel(f.name === ".." ? null : f.name)}
                 onDoubleClick={() => openRemote(f)}
               >
-                <span className="fname" style={{ color: f.ftype === "dir" ? "#a9c2dc" : "var(--body)" }}>
+                <span className="fname" style={{ color: f.ftype === "dir" ? "#a3cdb4" : "var(--body)" }}>
                   <span style={f.ftype === "dir" ? { width: 11, height: 9, borderRadius: 2, background: "var(--accent)", opacity: 0.85, flex: "none" } : { width: 10, height: 12, borderRadius: 2, border: "1px solid #4a4f58", flex: "none" }} />
                   <span>{f.ftype === "dir" && f.name !== ".." ? f.name + "/" : f.name}</span>
                 </span>
