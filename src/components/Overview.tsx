@@ -104,6 +104,32 @@ export function Overview({ server, runtime, onRefresh, toast }: Props) {
   const m = runtime.metrics;
   const [, tick] = useState(0);
   const [logs, setLogs] = useState<{ name: string; text: string } | null>(null);
+  const [cMenu, setCMenu] = useState<{ name: string; state: string; x: number; y: number } | null>(null);
+  const [confirm, setConfirm] = useState<{ action: string; label: string; name: string; danger: boolean } | null>(null);
+  const [acting, setActing] = useState(false);
+
+  const runDocker = async (action: string, name: string) => {
+    setActing(true);
+    try {
+      const res = await ipc.dockerAction(server, action, name);
+      if (res.code === 0) toast(`docker ${action}: ${name}`);
+      else toast(`docker ${action} · ${name}: ${res.out.trim() || "код " + res.code}`, true);
+      onRefresh();
+    } catch (e) {
+      toast(`${t("Ошибка:")} ${e}`, true);
+    } finally {
+      setActing(false);
+      setConfirm(null);
+    }
+  };
+
+  const dockerItems: [string, string, boolean][] = [
+    ["Логи", "logs", false],
+    ["Старт", "start", false],
+    ["Стоп", "stop", true],
+    ["Рестарт", "restart", true],
+    ["Удалить", "rm", true],
+  ];
 
   useEffect(() => {
     const iv = setInterval(() => tick((n) => n + 1), 1000);
@@ -209,12 +235,79 @@ export function Overview({ server, runtime, onRefresh, toast }: Props) {
                   <span style={{ fontSize: 12, color: col }}>{c.state}</span>
                 </span>
                 <span className="mono" style={{ fontSize: 11.5, color: "var(--muted)" }}>{c.status}</span>
-                <span className="link" style={{ textAlign: "right" }} onClick={() => void showLogs(c.name)}>
-                  {t("логи")}
+                <span
+                  className="link"
+                  style={{ textAlign: "right", fontSize: 15, letterSpacing: 1 }}
+                  title={t("Действия")}
+                  onClick={(e) => setCMenu({ name: c.name, state: c.state, x: e.clientX, y: e.clientY })}
+                >
+                  ⋯
                 </span>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {cMenu && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 65 }} onClick={() => setCMenu(null)} />
+          <div className="ctx-menu" style={{ left: Math.min(cMenu.x, window.innerWidth - 200), top: Math.min(cMenu.y, window.innerHeight - 220), width: 180 }}>
+            <div className="mono" style={{ padding: "5px 10px 7px", fontSize: 10.5, color: "var(--dim)", borderBottom: "1px solid var(--border)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {cMenu.name}
+            </div>
+            {dockerItems
+              .filter(([, action]) =>
+                action === "logs" || action === "rm"
+                  ? true
+                  : action === "start"
+                  ? cMenu.state !== "running"
+                  : cMenu.state === "running"
+              )
+              .map(([label, action, danger]) => (
+                <div
+                  key={action}
+                  className={"ctx-item" + (danger ? " danger" : "")}
+                  onClick={() => {
+                    const name = cMenu.name;
+                    setCMenu(null);
+                    if (action === "logs") void showLogs(name);
+                    else if (danger) setConfirm({ action, label: t(label), name, danger });
+                    else void runDocker(action, name);
+                  }}
+                >
+                  <span style={{ width: 16, textAlign: "center", color: danger ? "var(--red)" : "var(--muted)" }}>
+                    {action === "logs" ? "≡" : action === "start" ? "▸" : action === "stop" ? "■" : action === "restart" ? "↻" : "✕"}
+                  </span>
+                  <span>{t(label)}</span>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+
+      {confirm && (
+        <div className="overlay" onClick={() => !acting && setConfirm(null)}>
+          <div className="modal" style={{ width: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              {confirm.label} · docker
+              <span className="modal-x" onClick={() => !acting && setConfirm(null)}>×</span>
+            </div>
+            <div style={{ padding: 18, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+              {confirm.action === "rm" ? t("Удалить контейнер") : confirm.action === "stop" ? t("Остановить контейнер") : t("Перезапустить контейнер")}{" "}
+              <b className="mono">{confirm.name}</b>{t(" на")} <span className="mono">{server.name}</span>?
+              <div style={{ fontSize: 11.5, color: "var(--yellow)", marginTop: 8 }}>
+                {t("Это продакшен — действие затронет живой сервис.")}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <span style={{ flex: 1 }} />
+              <div className="btn-text" onClick={() => !acting && setConfirm(null)}>{t("Отмена")}</div>
+              <div className={"btn-danger" + (acting ? " disabled" : "")} style={{ padding: "9px 16px" }} onClick={() => void runDocker(confirm.action, confirm.name)}>
+                {acting ? "…" : confirm.label}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
