@@ -440,6 +440,10 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             setup_tray(app)?;
+            if let Ok(dir) = app.path().app_config_dir() {
+                std::fs::create_dir_all(&dir).ok();
+                let _ = ssh::KNOWN_HOSTS.set(dir.join("known_hosts"));
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
