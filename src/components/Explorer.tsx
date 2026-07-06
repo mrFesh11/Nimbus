@@ -22,8 +22,8 @@ function iconMeta(f: FileEntry): { bg?: string; border?: boolean; label: string 
   if (f.ftype === "link") return { bg: "#6ea3a0", label: "LN" };
   const ext = f.name.includes(".") ? f.name.split(".").pop()!.toLowerCase() : "";
   const map: Record<string, { bg: string; label: string }> = {
-    js: { bg: "#d1a24d", label: "JS" }, ts: { bg: "#5b93cc", label: "TS" },
-    json: { bg: "#6ea36b", label: "{}" }, sh: { bg: "#5b93cc", label: "SH" },
+    js: { bg: "#d1a24d", label: "JS" }, ts: { bg: "#46a86e", label: "TS" },
+    json: { bg: "#6ea36b", label: "{}" }, sh: { bg: "#46a86e", label: "SH" },
     md: { bg: "#868c96", label: "MD" }, py: { bg: "#6ea36b", label: "PY" },
     rs: { bg: "#c08a4a", label: "RS" }, go: { bg: "#6ea3a0", label: "GO" },
     yml: { bg: "#a97bc4", label: "YM" }, yaml: { bg: "#a97bc4", label: "YM" },
@@ -509,7 +509,7 @@ export function Explorer({ server, toast }: Props) {
                     onDoubleClick={() => openResult(r)}
                     onClick={() => openResult(r)}
                   >
-                    <span className="fname" style={{ color: r.type === "d" ? "#a9c2dc" : "var(--body)" }}>
+                    <span className="fname" style={{ color: r.type === "d" ? "#a3cdb4" : "var(--body)" }}>
                       <span style={r.type === "d" ? { width: 11, height: 9, borderRadius: 2, background: "var(--accent)", opacity: 0.85, flex: "none" } : { width: 10, height: 12, borderRadius: 2, border: "1px solid #4a4f58", flex: "none" }} />
                       <span>{r.path}</span>
                     </span>
@@ -560,7 +560,7 @@ export function Explorer({ server, toast }: Props) {
                     >
                       <span className={"check" + (selected[f.name] ? " on" : "")}>{selected[f.name] ? "✓" : ""}</span>
                     </span>
-                    <span className="fname" style={{ color: f.hidden ? "#6a7079" : f.ftype === "dir" ? "#a9c2dc" : "var(--body)" }}>
+                    <span className="fname" style={{ color: f.hidden ? "#6a7079" : f.ftype === "dir" ? "#a3cdb4" : "var(--body)" }}>
                       <FIcon f={f} />
                       <span>{f.name}</span>
                     </span>
@@ -597,7 +597,7 @@ export function Explorer({ server, toast }: Props) {
                   }}
                 >
                   <FIcon f={f} size={36} />
-                  <span style={{ color: f.hidden ? "#6a7079" : f.ftype === "dir" ? "#a9c2dc" : "var(--body)" }}>{f.name}</span>
+                  <span style={{ color: f.hidden ? "#6a7079" : f.ftype === "dir" ? "#a3cdb4" : "var(--body)" }}>{f.name}</span>
                 </div>
               ))}
             </div>
@@ -700,7 +700,7 @@ export function Explorer({ server, toast }: Props) {
       </div>
 
       {dragOver && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(91,147,204,0.08)", border: "2px dashed var(--accent)", borderRadius: 8, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(70, 168, 110,0.08)", border: "2px dashed var(--accent)", borderRadius: 8, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ fontSize: 14, color: "var(--text)", background: "var(--panel)", padding: "10px 18px", borderRadius: 8, border: "1px solid var(--border)" }}>
             ↥ {t("Отпустите для загрузки в")} <span className="mono" style={{ color: "var(--accent)" }}>{path}</span>
           </div>
