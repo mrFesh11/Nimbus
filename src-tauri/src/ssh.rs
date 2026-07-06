@@ -1,11 +1,56 @@
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::{TcpStream, ToSocketAddrs};
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
+
+pub static KNOWN_HOSTS: OnceLock<PathBuf> = OnceLock::new();
+static KNOWN_HOSTS_LOCK: Mutex<()> = Mutex::new(());
+
+fn check_host_key(sess: &Session, label: &str) -> Result<(), String> {
+    let Some(path) = KNOWN_HOSTS.get() else {
+        return Ok(());
+    };
+    let hash = sess
+        .host_key_hash(ssh2::HashType::Sha256)
+        .ok_or("server did not present a host key")?;
+    let fp = format!(
+        "SHA256:{}",
+        base64::engine::general_purpose::STANDARD_NO_PAD.encode(hash)
+    );
+    let _guard = KNOWN_HOSTS_LOCK.lock().unwrap();
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    for line in content.lines() {
+        if let Some((h, known)) = line.split_once(' ') {
+            if h == label {
+                if known == fp {
+                    return Ok(());
+                }
+                return Err(format!(
+                    "host key mismatch for {label}: known {known}, got {fp}. \
+Возможен MITM. Если смена ключа ожидаема — удалите строку в {}",
+                    path.display()
+                ));
+            }
+        }
+    }
+    let mut out = content;
+    if !out.is_empty() && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str(&format!("{label} {fp}\n"));
+    std::fs::write(path, out).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).ok();
+    }
+    Ok(())
+}
 
 pub type ControlMap = Arc<Mutex<HashMap<String, Arc<Mutex<Option<Session>>>>>>;
 pub type OwnersMap = Arc<Mutex<HashMap<String, HashMap<u32, String>>>>;
@@ -65,11 +110,12 @@ fn tcp_connect(host: &str, port: u16) -> Result<TcpStream, String> {
     Ok(tcp)
 }
 
-fn session_over(tcp: TcpStream, user: &str, key_path: &str) -> Result<Session, String> {
+fn session_over(tcp: TcpStream, user: &str, key_path: &str, label: &str) -> Result<Session, String> {
     let mut sess = Session::new().map_err(|e| e.to_string())?;
     sess.set_tcp_stream(tcp);
     sess.set_timeout(20000);
     sess.handshake().map_err(|e| format!("handshake: {e}"))?;
+    check_host_key(&sess, label)?;
 
     let key = expand_tilde(key_path.trim());
     let mut last_err = String::new();
@@ -96,8 +142,13 @@ fn tunnel_via_jump(jump: &JumpCfg, target_host: &str, target_port: u16) -> Resul
     use std::net::TcpListener;
 
     let jtcp = tcp_connect(&jump.host, jump.port)?;
-    let jsess = session_over(jtcp, &jump.user, &jump.key_path)
-        .map_err(|e| format!("jump {}: {e}", jump.host))?;
+    let jsess = session_over(
+        jtcp,
+        &jump.user,
+        &jump.key_path,
+        &format!("{}:{}", jump.host, jump.port),
+    )
+    .map_err(|e| format!("jump {}: {e}", jump.host))?;
     let mut channel = jsess
         .channel_direct_tcpip(target_host, target_port, None)
         .map_err(|e| format!("jump tunnel: {e}"))?;
@@ -189,7 +240,12 @@ pub fn connect(cfg: &ServerCfg) -> Result<Session, String> {
         Some(jump) => tunnel_via_jump(jump, &cfg.host, cfg.port)?,
         None => tcp_connect(&cfg.host, cfg.port)?,
     };
-    session_over(tcp, &cfg.user, &cfg.key_path)
+    session_over(
+        tcp,
+        &cfg.user,
+        &cfg.key_path,
+        &format!("{}:{}", cfg.host, cfg.port),
+    )
 }
 
 pub fn exec(sess: &Session, cmd: &str) -> Result<ExecOut, String> {
